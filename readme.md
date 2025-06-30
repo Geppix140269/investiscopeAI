@@ -1,6 +1,6 @@
 # InvestiscopeAI
 
-AI-powered property discovery and investment analysis platform for the Italian real estate market.
+AI-powered property discovery and investment analysis platform for the Italian real estate market!!
 
 ## 🚀 Features
 
