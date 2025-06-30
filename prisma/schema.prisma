@@ -1,0 +1,319 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  avatar        String?
+  phone         String?
+  role          UserRole  @default(USER)
+  preferences   Json?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Authentication
+  accounts Account[]
+  sessions Session[]
+
+  // User Activity
+  searches       Search[]
+  favorites      Favorite[]
+  alerts         Alert[]
+  viewHistory    PropertyView[]
+  savedSearches  SavedSearch[]
+  
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Property Management
+model Property {
+  id               String            @id @default(cuid())
+  externalId       String?           @unique
+  title            String
+  description      String?           @db.Text
+  address          String
+  city             String
+  province         String
+  region           String
+  postalCode       String?
+  country          String            @default("Italy")
+  latitude         Float?
+  longitude        Float?
+  neighborhood     String?
+
+  // Pricing
+  price            Int               // Price in EUR cents
+  pricePerSqm      Int?
+
+  // Property Details
+  propertyType     PropertyType
+  contractType     ContractType      @default(SALE)
+  rooms            Int?
+  bedrooms         Int?
+  bathrooms        Int?
+  sqm              Int?
+  floor            Int?
+  totalFloors      Int?
+  yearBuilt        Int?
+  energyClass      EnergyClass?
+  condition        PropertyCondition?
+
+  // Features
+  features         PropertyFeature[]
+  hasElevator      Boolean           @default(false)
+  hasParking       Boolean           @default(false)
+  hasGarden        Boolean           @default(false)
+  hasBalcony       Boolean           @default(false)
+  hasTerrace       Boolean           @default(false)
+
+  // Media
+  images           PropertyImage[]
+
+  // AI Analysis
+  aiScore          Float?
+  roiEstimate      Float?
+  marketTrend      MarketTrend?
+
+  // Market Data
+  viewCount        Int               @default(0)
+  favoriteCount    Int               @default(0)
+  daysOnMarket     Int?
+
+  // Agent Information
+  agentName        String?
+  agentPhone       String?
+  agentEmail       String?
+  agentAgency      String?
+
+  // Status
+  isActive         Boolean           @default(true)
+  isFeatured       Boolean           @default(false)
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relationships
+  favorites        Favorite[]
+  views            PropertyView[]
+  priceHistory     PriceHistory[]
+
+  @@index([city, propertyType, price])
+  @@index([latitude, longitude])
+  @@index([aiScore])
+  @@map("properties")
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  url        String
+  alt        String?
+  isPrimary  Boolean  @default(false)
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_images")
+}
+
+model PropertyFeature {
+  id         String   @id @default(cuid())
+  propertyId String
+  feature    String
+  category   String?
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_features")
+}
+
+// User Interactions
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  propertyId String
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+  @@map("favorites")
+}
+
+model PropertyView {
+  id         String   @id @default(cuid())
+  userId     String?
+  propertyId String
+  ipAddress  String?
+  duration   Int?
+  createdAt  DateTime @default(now())
+
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_views")
+}
+
+model Search {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String?
+  filters   Json
+  results   Json?
+  resultCount Int?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("searches")
+}
+
+model SavedSearch {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  filters     Json
+  alertEnabled Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_searches")
+}
+
+model Alert {
+  id          String     @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  criteria    Json
+  isActive    Boolean    @default(true)
+  frequency   AlertFrequency @default(DAILY)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}
+
+model PriceHistory {
+  id         String   @id @default(cuid())
+  propertyId String
+  price      Int
+  date       DateTime
+  source     String?
+  createdAt  DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("price_history")
+}
+
+// Enums
+enum UserRole {
+  USER
+  AGENT
+  ADMIN
+}
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  VILLA
+  PENTHOUSE
+  STUDIO
+  LOFT
+  COMMERCIAL
+  LAND
+  OTHER
+}
+
+enum ContractType {
+  SALE
+  RENT
+}
+
+enum EnergyClass {
+  A4
+  A3
+  A2
+  A1
+  B
+  C
+  D
+  E
+  F
+  G
+}
+
+enum PropertyCondition {
+  NEW
+  EXCELLENT
+  GOOD
+  TO_RENOVATE
+  RENOVATED
+}
+
+enum MarketTrend {
+  HOT
+  RISING
+  STABLE
+  DECLINING
+  COLD
+}
+
+enum AlertFrequency {
+  IMMEDIATE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
